@@ -8,8 +8,8 @@ This project involves creating a recommender system for an e-commerce platform. 
 	2.	[Dataset Selection](#dataset-selection)
 	3.	[Data Preprocessing and Exploration](#data-preprocessing-and-exploration)
 	4.	Building the Recommender System(#building-the-recommender-system)
-	•	Collaborative Filtering
-	•	Content-Based Filtering with NLP
+		•	Collaborative Filtering
+		•	Content-Based Filtering with NLP
 	5.	[Model Evaluation](#model-evaluation)
 	6.	[Developing a REST API](#developing-a-rest-api)
 	7.	[Containerizing with Docker](#containerizing-with-docker)
