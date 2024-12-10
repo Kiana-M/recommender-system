@@ -4,6 +4,7 @@ This project involves creating a recommender system for an e-commerce platform. 
 
 ##Table of Contents
 
+	0. 	Installation Guide
 	1.	[Project Overview](#project-overview)
 	2.	[Dataset Selection](#dataset-selection)
 	3.	[Data Preprocessing and Exploration](#data-preprocessing-and-exploration)
@@ -16,6 +17,17 @@ This project involves creating a recommender system for an e-commerce platform. 
 	8.	[Deploying on AWS](#deploying-on-aws)
 	9.	[Model Monitoring](#model-monitoring)
 	10.	[Conclusion](#conclusion)
+
+
+Installation Guide
+Download repo and install requirements.txt, then run 
+```bash
+python app.py
+```
+Example usage with RESTful api: 
+http://localhost/recommend?product_id=B00YQ6X8EO&num_recommendations=5
+
+
 
 Project Overview
 
