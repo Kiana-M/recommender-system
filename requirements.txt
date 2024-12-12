@@ -1,0 +1,8 @@
+Flask
+huggingface-hub
+numpy
+pandas
+requests
+scikit-learn
+scipy
+datasets
