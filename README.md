@@ -5,18 +5,10 @@ This project involves creating a recommender system for an e-commerce platform. 
 ##Table of Contents
 
 	0. 	Installation Guide
-	1.	[Project Overview](#project-overview)
-	2.	[Dataset Selection](#dataset-selection)
-	3.	[Data Preprocessing and Exploration](#data-preprocessing-and-exploration)
-	4.	Building the Recommender System(#building-the-recommender-system)
-		•	Collaborative Filtering
-		•	Content-Based Filtering with NLP
-	5.	[Model Evaluation](#model-evaluation)
-	6.	[Developing a REST API](#developing-a-rest-api)
-	7.	[Containerizing with Docker](#containerizing-with-docker)
-	8.	[Deploying on AWS](#deploying-on-aws)
-	9.	[Model Monitoring](#model-monitoring)
-	10.	[Conclusion](#conclusion)
+	1.	Project Overview
+	2.	Dataset Selection
+	3.	Deployment via AWS
+	4. 	Monitoring
 
 
 Installation Guide
@@ -42,258 +34,151 @@ Dataset Selection
 
 We will use the Amazon Product Data available publicly for research purposes.
 
-Note: Ensure you comply with the dataset’s terms of use.
+Below is a more detailed, step-by-step guide to deploying your application on an AWS EC2 instance. This process assumes you have already created an AWS account that is eligible for the Free Tier. If you haven’t, make sure you’ve signed up and completed all the verification steps, including adding a payment method and confirming your email and phone number.
 
-Data Preprocessing and Exploration
+Step-by-Step Guide for Deployment Via EC2
 
-Step 1: Import Libraries
+1. Log In to the AWS Management Console
+	1.	Go to the AWS Management Console.
+	2.	Sign in using the email and password associated with your AWS account.
 
-import pandas as pd
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import linear_kernel
+You should now see the AWS Management Console home page, which provides a search bar and a list of services.
 
-Step 2: Load the Dataset
+2. Navigate to the EC2 Service
+	1.	In the “Find Services” search bar at the top of the page, type EC2.
+	2.	Click on EC2 under the “Services” dropdown.
 
-# Assuming you have downloaded the dataset and saved it as 'products.csv'
-df = pd.read_csv('products.csv')
+This will take you to the EC2 Dashboard, where you can manage virtual servers, also called instances.
 
-Step 3: Explore the Dataset
+3. Launch a New EC2 Instance
+	1.	On the EC2 Dashboard, click on the “Launch instances” button.
+Alternatively, you can go to the left-hand navigation menu and click on “Instances,” then “Launch instances.”
+	2.	You’ll be taken to a “Launch an instance” page. Here, you need to configure the details of your virtual machine.
 
-print(df.head())
-print(df.info())
+4. Choose an Amazon Machine Image (AMI)
+	1.	Under the “Name and tags” section, give your instance a name, like recommender-system.
+	2.	Scroll down to the “Application and OS Images (Amazon Machine Image)” section.
+	3.	For a Free Tier-eligible machine, select an official Linux distribution:
+	•	Amazon Linux 2 AMI (Free Tier eligible)
+or
+	•	Ubuntu Server 20.04 LTS (Free Tier eligible)
 
-Step 4: Data Cleaning
+For simplicity, let’s choose Amazon Linux 2 AMI.
 
-	•	Handle missing values.
-	•	Remove duplicates.
+5. Choose an Instance Type
+	1.	Under the “Instance type” section, pick t2.micro (Free Tier eligible).
+	•	t2.micro comes with 1 vCPU and 1 GiB RAM, which is enough for small experiments.
 
-df.dropna(subset=['product_id', 'title', 'description'], inplace=True)
-df.drop_duplicates(subset=['product_id'], inplace=True)
+6. Configure Key Pair (Login Credentials)
+	1.	Under “Key pair (login)” select Create a new key pair if you don’t have one already.
+	2.	Give the key pair a name, for example my-ec2-keypair.
+	3.	Choose the key pair type (RSA) and file format (.pem for Linux/macOS or .ppk for Windows with PuTTY).
+	4.	Click Create key pair. This will download a file to your local machine.
 
-Building the Recommender System
+Keep this key file safe. You will need it to SSH into your instance.
 
-Collaborative Filtering
+7. Network Settings
+	1.	Under “Network settings,” leave the defaults as is for now.
+	2.	Security group rules: A default security group will be created allowing SSH (port 22) access.
+If you plan to run a web server (such as the Flask app from our earlier discussion), you should also add a rule to allow inbound HTTP (port 80) traffic:
+	•	Click “Edit” under the security group settings.
+	•	Add a rule:
+Type: HTTP
+Source: Anywhere (0.0.0.0/0)
+This allows external clients to access your API once it’s deployed.
 
-We will use user ratings to find similarities between users or items.
+8. Configure Storage
+	1.	By default, the instance will come with an 8 GB EBS volume. This should be sufficient for starting out. You can leave the defaults.
 
-Note: For brevity, we will focus on item-based collaborative filtering.
+9. Review and Launch
+	1.	Review all the settings you selected.
+	2.	Click Launch instance at the bottom-right corner of the page.
+	3.	AWS will now provision your instance. This usually takes a couple of minutes.
 
-Step 1: Create a User-Item Matrix
+10. View Your Running EC2 Instance
+	1.	Click on “View all instances” after launching.
+	2.	You will see your new instance in a “pending” state. Wait until the “Instance state” shows running and the “Status checks” shows 2/2 checks passed.
 
-user_item_matrix = df.pivot_table(index='user_id', columns='product_id', values='rating')
+Once the instance is running, you have a virtual machine (VM) in the cloud that you can remotely connect to and set up your recommender system application.
 
-Step 2: Compute Item Similarity
+Connecting to Your EC2 Instance
 
-from sklearn.metrics.pairwise import cosine_similarity
+1. Locate Your Instance’s Public DNS or IP
+	1.	In the EC2 Console, click on Instances in the left navigation panel.
+	2.	Select the instance you just launched.
+	3.	In the “Description” tab at the bottom, look for the Public IPv4 address or Public IPv4 DNS. This is what you’ll use to connect to your instance.
 
-item_similarity = cosine_similarity(user_item_matrix.T.fillna(0))
-item_similarity_df = pd.DataFrame(item_similarity, index=user_item_matrix.columns, columns=user_item_matrix.columns)
+2. SSH into Your EC2 Instance (Linux/Mac)
+	1.	Open a terminal on your local machine.
+	2.	Navigate to the directory where your downloaded .pem key is located.
+	3.	Change the permissions of the key file to be more secure:
 
-Step 3: Recommend Products
+chmod 400 my-ec2-keypair.pem
 
-def recommend_products(product_id, num_recommendations):
-    sim_scores = item_similarity_df[product_id].sort_values(ascending=False)[1:num_recommendations+1]
-    return sim_scores.index.tolist()
 
-# Example usage:
-recommend_products('B001E4KFG0', 5)
+	4.	Connect to the instance:
 
-Content-Based Filtering with NLP
+ssh -i "my-ec2-keypair.pem" ec2-user@<your-instance-public-dns>
 
-We will use product descriptions to find similar products.
+Replace <your-instance-public-dns> with the value from the EC2 console (something like ec2-3-122-50-33.compute-1.amazonaws.com).
 
-Step 1: Text Preprocessing
+For Ubuntu instances, the default user is ubuntu instead of ec2-user:
 
-# Assuming 'description' column contains product descriptions
-df['description'] = df['description'].fillna('')
+ssh -i "my-ec2-keypair.pem" ubuntu@<your-instance-public-dns>
 
-Step 2: Vectorization using TF-IDF
+3. SSH into Your EC2 Instance (Windows)
+	•	If you’re using Windows, you can use PuTTY or Windows Subsystem for Linux (WSL).
+	•	For PuTTY:
+	1.	Convert .pem to .ppk using PuTTYgen.
+	2.	Open PuTTY, enter <your-instance-public-dns> in the Host Name field.
+	3.	Under SSH > Auth in the sidebar, browse to your .ppk file.
+	4.	Click Open to connect.
 
-tfidf = TfidfVectorizer(stop_words='english')
-tfidf_matrix = tfidf.fit_transform(df['description'])
+Setting Up Your Environment on EC2
 
-Step 3: Compute Cosine Similarity
-
-cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
-
-Step 4: Build a Reverse Mapping of Indices and Product IDs
-
-indices = pd.Series(df.index, index=df['product_id']).drop_duplicates()
-
-Step 5: Recommend Products
-
-def content_based_recommendations(product_id, num_recommendations):
-    idx = indices[product_id]
-    sim_scores = list(enumerate(cosine_sim[idx]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:num_recommendations+1]
-    product_indices = [i[0] for i in sim_scores]
-    return df['product_id'].iloc[product_indices].tolist()
-
-# Example usage:
-content_based_recommendations('B001E4KFG0', 5)
-
-Model Evaluation
-
-Since recommender systems are evaluated differently, we can use metrics like Precision@K, Recall@K.
-
-Step 1: Split Data into Train and Test Sets
-
-from sklearn.model_selection import train_test_split
-
-train_data, test_data = train_test_split(df, test_size=0.2, random_state=42)
-
-Step 2: Evaluate Using Appropriate Metrics
-
-Due to the complexity, we’ll focus on a simple hit-rate calculation.
-
-def hit_rate(recommendations, actual):
-    hits = sum([1 for item in recommendations if item in actual])
-    return hits / len(actual)
-
-# Example usage:
-actual_products = test_data[test_data['user_id'] == 'A3OXHLG6DIBRW8']['product_id'].tolist()
-recommended_products = recommend_products('B001E4KFG0', 5)
-print("Hit Rate:", hit_rate(recommended_products, actual_products))
-
-Developing a REST API
-
-We will use Flask to create a RESTful API.
-
-Step 1: Install Flask
-
-pip install flask
-
-Step 2: Create app.py
-
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
-@app.route('/recommend', methods=['GET'])
-def recommend():
-    product_id = request.args.get('product_id')
-    num_recommendations = int(request.args.get('num_recommendations', 5))
-    recommendations = content_based_recommendations(product_id, num_recommendations)
-    return jsonify({'recommended_products': recommendations})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
-
-Step 3: Test the API Locally
-
-python app.py
-
-Visit http://localhost:80/recommend?product_id=B001E4KFG0&num_recommendations=5 in your browser.
-
-Containerizing with Docker
-
-Step 1: Write a Dockerfile
-
-Create a file named Dockerfile:
-
-# Use an official Python runtime as a parent image
-FROM python:3.8-slim
-
-# Set the working directory
-WORKDIR /app
-
-# Copy the current directory contents into the container
-COPY . /app
-
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Expose port 80
-EXPOSE 80
-
-# Run app.py when the container launches
-CMD ["python", "app.py"]
-
-Step 2: Create requirements.txt
-
-flask
-pandas
-numpy
-scikit-learn
-
-Step 3: Build the Docker Image
-
-docker build -t recommender-system .
-
-Step 4: Run the Docker Container
-
-docker run -p 80:80 recommender-system
-
-Deploying on AWS
-
-Step 1: Set Up an AWS Account
-
-	•	Sign up for an AWS Free Tier account if you haven’t already.
-
-Step 2: Launch an EC2 Instance
-
-	•	Choose the Amazon Linux 2 AMI.
-	•	Select the t2.micro instance type (Free Tier eligible).
-	•	Configure security groups to allow inbound traffic on port 80.
-
-Step 3: Install Docker on EC2
-
-SSH into your EC2 instance and run:
+Once logged in, you can:
+	1.	Update the instance:
 
 sudo yum update -y
-sudo amazon-linux-extras install docker
+
+(If using Amazon Linux; if Ubuntu, use sudo apt update && sudo apt upgrade -y)
+
+	2.	Install Docker if needed:
+
+sudo amazon-linux-extras install docker -y
 sudo service docker start
 sudo usermod -a -G docker ec2-user
+# Log out and back in for this to take effect
 
-Step 4: Transfer Your Docker Image
 
-Option 1: Build the image on the EC2 instance.
-	•	Install Git: sudo yum install git -y
-	•	Clone your repository: git clone <your-repo-url>
-	•	Build the Docker image: docker build -t recommender-system .
+	3.	Clone your repository or upload files:
 
-Option 2: Push to Docker Hub and Pull on EC2
-	•	Tag your image: docker tag recommender-system <your-dockerhub-username>/recommender-system
-	•	Push to Docker Hub: docker push <your-dockerhub-username>/recommender-system
-	•	On EC2, pull the image: docker pull <your-dockerhub-username>/recommender-system
+git clone https://github.com/yourusername/recommender-system.git
 
-Step 5: Run the Docker Container on EC2
 
+	4.	Build and run your Docker container:
+
+cd recommender-system
+docker build -t recommender-system .
 docker run -d -p 80:80 recommender-system
 
-Step 6: Test the Deployed API
 
-	•	Access http://<your-ec2-instance-public-dns>/recommend?product_id=B001E4KFG0&num_recommendations=5
 
-Model Monitoring
+Your Flask app (if it listens on port 80) is now accessible via http://<your-instance-public-dns>/recommend.
 
-We can use AWS CloudWatch for monitoring or integrate logging within our application.
+Testing Your Deployed Application
+	1.	In your local web browser, go to:
 
-Step 1: Implement Logging in app.py
+http://<your-instance-public-dns>/recommend?product_id=B001E4KFG0&num_recommendations=5
 
-import logging
+If everything is set up correctly, you should receive a JSON response with the recommended products.
 
-# Configure logging
-logging.basicConfig(filename='app.log', level=logging.INFO)
-
-@app.route('/recommend', methods=['GET'])
-def recommend():
-    product_id = request.args.get('product_id')
-    num_recommendations = int(request.args.get('num_recommendations', 5))
-    recommendations = content_based_recommendations(product_id, num_recommendations)
-    # Log the request
-    logging.info(f"Product ID: {product_id}, Recommendations: {recommendations}")
-    return jsonify({'recommended_products': recommendations})
-
-Step 2: Set Up CloudWatch Logs (Optional)
-
-	•	Install the CloudWatch agent on your EC2 instance.
-	•	Configure the agent to monitor the app.log file.
+Additional Tips
+	•	Security: Avoid opening SSH from anywhere (0.0.0.0/0) in production. Restrict to your IP for better security.
+	•	Costs: EC2 Free Tier is free for 750 hours per month of t2.micro usage, but watch out for other services you enable that might incur costs.
+	•	Scaling: If you need more resources later, you can stop your instance and change its type to a larger one (not free tier).
+	•	Stopping the Instance: When not in use, you can stop the instance to avoid charges for associated services like EBS storage (although EBS under free tier might be partially covered).
 
 Conclusion
 
-You’ve now built a full-fledged recommender system for e-commerce products, encompassing data preprocessing, model development, deployment, and monitoring. This project showcases your abilities in machine learning engineering, NLP, Docker, AWS, RESTful APIs, and model monitoring.
-
-Note: Always ensure that you handle data responsibly and comply with any licensing requirements of the datasets and tools you use.
+Launching an EC2 instance on AWS involves logging into the AWS Management Console, navigating to EC2, configuring an instance with a Free Tier eligible AMI and instance type, setting up security groups, and then launching it. With these steps, you can access the instance via SSH, set up your application, and run it live on the internet. As you grow more comfortable with the AWS environment, you can explore more advanced features such as load balancing, auto-scaling, and continuous deployment pipelines.
